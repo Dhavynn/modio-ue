@@ -1,0 +1,226 @@
+/*
+ *  Copyright (C) 2021 mod.io Pty Ltd. <https://mod.io>
+ *
+ *  This file is part of the mod.io SDK.
+ *
+ *  Distributed under the MIT License. (See accompanying file LICENSE or
+ *   view online at <https://github.com/modio/modio-sdk/blob/main/LICENSE>)
+ *
+ */
+
+#include "modio/core/ModioCoreTypes.h"
+#include "modio/detail/ModioSDKSessionData.h"
+#include "modio/detail/serialization/ModioUserSerialization.h"
+#include "modio/detail/ops/AuthenticateUserByEmailOp.h"
+#include "modio/detail/ops/RequestEmailAuthCodeOp.h"
+#include "modio/detail/ops/auth/AuthenticateUserByApple.h"
+#include "modio/detail/ops/auth/AuthenticateUserByDiscord.h"
+#include "modio/detail/ops/auth/AuthenticateUserByEpic.h"
+#include "modio/detail/ops/auth/AuthenticateUserByGog.h"
+#include "modio/detail/ops/auth/AuthenticateUserByGoogleIDToken.h"
+#include "modio/detail/ops/auth/AuthenticateUserByGoogleServerSideToken.h"
+#include "modio/detail/ops/auth/AuthenticateUserByItch.h"
+#include "modio/detail/ops/auth/AuthenticateUserByOculus.h"
+#include "modio/detail/ops/auth/AuthenticateUserByOpenID.h"
+#include "modio/detail/ops/auth/AuthenticateUserByPSN.h"
+#include "modio/detail/ops/auth/AuthenticateUserBySteam.h"
+#include "modio/detail/ops/auth/AuthenticateUserBySwitchID.h"
+#include "modio/detail/ops/auth/AuthenticateUserByXBoxLive.h"
+#include "modio/detail/ops/auth/AuthenticateUserDelegatedToken.h"
+#include "modio/detail/ops/auth/ModioGetTermsOfUseOp.h"
+#include "modio/detail/ops/user/GetUserMediaOp.h"
+#include "modio/detail/ops/userdata/GetUserRatingsOp.h"
+#include "modio/detail/ops/userdata/ListUserGamesOp.h"
+#include "modio/detail/ops/userdata/RefreshUserDataOp.h"
+#include "modio/impl/SDKPreconditionChecks.h"
+
+namespace Modio
+{
+	void RequestEmailAuthCodeAsync(Modio::EmailAddress EmailAddress, std::function<void(Modio::ErrorCode)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([EmailAddress, Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback))
+			{
+				Modio::Detail::RequestEmailAuthCodeAsync(EmailAddress, Callback);
+			}
+		});
+	}
+
+	void GetTermsOfUseAsync(std::function<void(Modio::ErrorCode, Modio::Optional<Modio::Terms> Terms)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback))
+			{
+				Modio::Detail::GetTermsOfUseAsync(Callback);
+			}
+		});
+	}
+
+	void AuthenticateUserExternalAsync(Modio::AuthenticationParams User, Modio::AuthenticationProvider Provider,
+									   std::function<void(Modio::ErrorCode)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([User, Provider, Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback))
+			{
+				// Check if the User's AuthToken needs URL encoding
+				if (User.bURLEncodeAuthToken == true)
+				{
+					User.AuthToken = Modio::Detail::String::URLEncode(User.AuthToken);
+				}
+
+				switch (Provider)
+				{
+					case AuthenticationProvider::GoG:
+						Modio::Detail::AuthenticateUserByGoGAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Itch:
+						Modio::Detail::AuthenticateUserByItchAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Steam:
+						Modio::Detail::AuthenticateUserBySteamAsync(User, Callback);
+						break;
+					case AuthenticationProvider::XboxLive:
+						Modio::Detail::AuthenticateUserByXBoxLiveAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Switch:
+						Modio::Detail::AuthenticateUserBySwitchIDAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Discord:
+						Modio::Detail::AuthenticateUserByDiscordAsync(User, Callback);
+						break;
+					case AuthenticationProvider::PSN:
+						Modio::Detail::AuthenticateUserByPSNAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Epic:
+						Modio::Detail::AuthenticateUserByEpicAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Oculus:
+						// Oculus requires extended parameters to be sent along, so we validate the parameters
+						// with our precondition check here.
+						if (Modio::Detail::RequireValidOculusExtendedParameters(User, Callback) == false)
+						{
+							return;
+						}
+						Modio::Detail::AuthenticateUserByOculusAsync(User, Callback);
+						break;
+					case AuthenticationProvider::OpenID:
+						Modio::Detail::AuthenticateUserByOpenIDAsync(User, Callback);
+						break;
+					case AuthenticationProvider::Apple:
+						Modio::Detail::AuthenticateUserByAppleAsync(User, Callback);
+						break;
+					case AuthenticationProvider::GoogleIDToken:
+						Modio::Detail::AuthenticateUserByGoogleIDTokenAsync(User, Callback);
+						break;
+					case AuthenticationProvider::GoogleServerSideToken:
+						Modio::Detail::AuthenticateUserByGoogleServerSideTokenAsync(User, Callback);
+						break;
+				}
+			}
+			});
+
+		// Return immediately if the SDK is not initialized or the API rate limit is reached
+	}
+
+	void AuthenticateUserDelegatedTokenAsync(Modio::AuthenticationParams User, std::function<void(Modio::ErrorCode)> Callback){
+		Modio::Detail::SDKSessionData::EnqueueTask([User, Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback))
+			{
+				Modio::Detail::AuthenticateUserDelegatedTokenAsync(User, Callback);
+			}
+
+		});
+	}
+
+	void AuthenticateUserEmailAsync(Modio::EmailAuthCode AuthenticationCode,
+									std::function<void(Modio::ErrorCode)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([AuthenticationCode, Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback))
+			{
+				Modio::Detail::AuthenticateUserByEmailAsync(AuthenticationCode, Callback);
+			}
+		});
+	}
+
+	void ClearUserDataAsync(std::function<void(Modio::ErrorCode)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) &&
+				Modio::Detail::RequireUserIsAuthenticated(Callback))
+			{
+				return Modio::Detail::Services::GetGlobalService<Modio::Detail::UserDataService>().ClearUserDataAsync(
+					Callback);
+			}
+		});
+	}
+
+	void VerifyUserAuthenticationAsync(std::function<void(Modio::ErrorCode)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback) &&
+				Modio::Detail::RequireUserIsAuthenticated(Callback))
+			{
+				Modio::Detail::VerifyUserAuthenticationAsync(Callback);
+			}
+		});
+	}
+
+	void RefreshUserDataAsync(std::function<void(Modio::ErrorCode)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback) &&
+				Modio::Detail::RequireUserIsAuthenticated(Callback))
+			{
+				Modio::Detail::RefreshUserDataAsync(Callback);
+			}
+		});
+	}
+
+	Modio::Optional<Modio::User> QueryUserProfile()
+	{
+		auto Lock = Modio::Detail::SDKSessionData::GetReadLock();
+		if (Modio::Detail::SDKSessionData::IsInitialized())
+		{
+			return Modio::Detail::SDKSessionData::GetAuthenticatedUser();
+		}
+		return {};
+	}
+
+	void GetUserMediaAsync(Modio::AvatarSize AvatarSize,
+						   std::function<void(Modio::ErrorCode, Modio::Optional<std::string>)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([AvatarSize, Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback) &&
+				Modio::Detail::RequireUserIsAuthenticated(Callback))
+			{
+				return Modio::Detail::GetUserMediaAsync(AvatarSize, Callback);
+			}
+		});
+	}
+
+	void ListUserGamesAsync(Modio::FilterParams Filter,
+							std::function<void(Modio::ErrorCode, Modio::Optional<Modio::GameInfoList>)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([Filter = std::move(Filter),
+													Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback) &&
+				Modio::Detail::RequireUserIsAuthenticated(Callback))
+			{
+				Modio::Detail::ListUserGamesAsync(Filter, Callback);
+			}
+		});
+	}
+
+	void GetUserRatingsAsync(std::function<void(Modio::ErrorCode, Modio::Optional<Modio::UserRatingList>)> Callback)
+	{
+		Modio::Detail::SDKSessionData::EnqueueTask([Callback = std::move(Callback)]() mutable {
+			if (Modio::Detail::RequireSDKIsInitialized(Callback) && Modio::Detail::RequireNotRateLimited(Callback) &&
+				Modio::Detail::RequireUserIsAuthenticated(Callback))
+			{
+				Modio::Detail::GetUserRatingsAsync(Callback);
+			}
+		});
+	}
+
+} // namespace Modio
